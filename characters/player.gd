@@ -1,32 +1,72 @@
-extends CharacterBody2D
+extends RigidBody2D
+class_name CharacterController
 
-# Constants
-const GRAVITY = 2000.0
-const MAX_SPEED = 800.0
-const JUMP_FORCE = -800.0
+var is_grounded: bool = false
+var ground_normal: Vector2 = Vector2.UP
+var target_position: Vector2
+
+@export var collision_detector : RayCast2D
+
+func _ready() -> void:
+	continuous_cd = RigidBody2D.CCD_MODE_CAST_RAY
+	
+	target_position = Vector2(-200, 0)
+	position = target_position
+
+
+func _process(delta):
+	# Keep player roughly in the same screen position
+	# Allow some movement but pull back to target
+	var pull_strength = 2.0
+	var offset = position - target_position
+	
+	if abs(offset.x) > 50:  # Only pull if too far from target
+		apply_central_impulse(Vector2(-offset.x * pull_strength, 0))
+
 
 func _physics_process(delta):
-	if is_on_floor():
-		# Get the slope's normal
-		var floor_normal = get_floor_normal()
+	check_ground_contact()
+	#handle_rotation(delta)
 
-		# Project gravity along the slope (downhill direction)
-		var downhill_direction = ProjectSettings.get_setting("physics/2d/default_gravity_vector").normalized().slide(floor_normal).normalized()
-		var slope_acceleration = downhill_direction * GRAVITY
 
-		# Add slope acceleration to velocity
-		velocity += slope_acceleration * delta
-
-		# Jumping
-		if Input.is_action_just_pressed("ui_accept"):
-			velocity.y = JUMP_FORCE
+func check_ground_contact():
+	# Use a raycast or area to detect ground
+	var space_state = get_world_2d().direct_space_state
+	var query = PhysicsRayQueryParameters2D.create(
+		global_position,
+		global_position + Vector2(0, 30)
+	)
+	query.exclude = [self]
+	
+	var result = space_state.intersect_ray(query)
+	
+	if result:
+		is_grounded = true
+		ground_normal = result.normal
 	else:
-		# Apply vertical gravity in air
-		velocity.y += GRAVITY * delta
+		is_grounded = false
+		ground_normal = Vector2.UP
 
-	# Cap max speed (optional)
-	if velocity.length() > MAX_SPEED:
-		velocity = velocity.normalized() * MAX_SPEED
+#func handle_rotation(delta):
+	#var target_rotation = 0.0
+	#
+	#if is_grounded:
+		## Align with slope
+		#target_rotation = ground_normal.angle() - PI/2
+		#target_rotation = clamp(target_rotation, -deg_to_rad(max_rotation), deg_to_rad(max_rotation))
+	#else:
+		## Air control based on input
+		#if Input.is_action_pressed("rotate_left"):
+			#target_rotation = -deg_to_rad(max_rotation)
+		#elif Input.is_action_pressed("rotate_right"):
+			#target_rotation = deg_to_rad(max_rotation)
+	#
+	## Smoothly rotate to target
+	#rotation = lerp_angle(rotation, target_rotation, rotation_speed * delta)
 
-	# Move the character
-	move_and_slide()
+
+func _integrate_forces(state):
+	# Apply slight forward momentum to simulate skiing
+	if is_grounded:
+		var slope_direction = Vector2(ground_normal.y, -ground_normal.x)
+		state.apply_central_force(slope_direction * 100)
