@@ -2,6 +2,7 @@ extends Node2D
 class_name TerrainManager
 
 @export var world_speed: float = 150.0
+@export var slope_offset: float = 0.4
 
 @export var terrain_segments: Array[TerrainSegment] = []
 
@@ -13,9 +14,7 @@ func _ready() -> void:
 
 
 func _process(delta):
-	# Move camera reference point
-	camera_x += world_speed * delta
 	
-	# Move all terrain segments
 	for segment in terrain_segments:
 		segment.position.x -= world_speed * delta
+		segment.position.y -= world_speed * slope_offset * delta
